@@ -1,0 +1,104 @@
+name: Cypress JavaScript Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'  # Daily at 3 AM UTC
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+        node-version: ['20', '22']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Cypress tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          build: npm run build
+          start: npm start
+          wait-on: 'http://localhost:3000'
+          wait-on-timeout: 120
+        env:
+          CYPRESS_BASE_URL: ${{ secrets.CYPRESS_BASE_URL }}
+          CYPRESS_API_URL: ${{ secrets.CYPRESS_API_URL }}
+      
+      - name: Merge Mochawesome reports
+        if: always()
+        run: |
+          npx mochawesome-merge cypress/reports/mochawesome/*.json > cypress/reports/mochawesome/report.json
+          npx marge cypress/reports/mochawesome/report.json -o cypress/reports/html
+      
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-report-${{ matrix.browser }}-${{ matrix.node-version }}
+          path: cypress/reports/html/
+          retention-days: 7
+      
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.browser }}-${{ matrix.node-version }}
+          path: cypress/screenshots/
+          retention-days: 7
+      
+      - name: Upload videos on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos-${{ matrix.browser }}-${{ matrix.node-version }}
+          path: cypress/videos/
+          retention-days: 7
+
+  docker-test:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker image
+        run: |
+          cd docker
+          docker build -t cypress-js-tests:latest ..
+      
+      - name: Run Docker tests
+        env:
+          CYPRESS_BASE_URL: ${{ secrets.CYPRESS_BASE_URL }}
+          CYPRESS_API_URL: ${{ secrets.CYPRESS_API_URL }}
+        run: |
+          cd docker
+          docker-compose up --abort-on-container-exit
+      
+      - name: Upload Docker test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-cypress-results
+          path: docker/../cypress/reports/
+          retention-days: 7

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  cypress-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ../cypress/videos:/app/cypress/videos
+      - ../cypress/screenshots:/app/cypress/screenshots
+      - ../cypress/reports:/app/cypress/reports
+      - ../cypress.env.json:/app/cypress.env.json:ro
+    environment:
+      - CYPRESS_BASE_URL=${CYPRESS_BASE_URL:-https://example.com}
+      - CYPRESS_VIEWPORT_WIDTH=1280
+      - CYPRESS_VIEWPORT_HEIGHT=720
+    command: npm test

@@ -1,0 +1,14 @@
+{
+  "validUser": {
+    "username": "demo_user",
+    "password": "demo_pass"
+  },
+  "invalidUser": {
+    "username": "invalid",
+    "password": "invalid"
+  },
+  "apiUser": {
+    "name": "Test User",
+    "email": "test@example.com"
+  }
+}
